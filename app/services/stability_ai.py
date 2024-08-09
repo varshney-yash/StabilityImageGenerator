@@ -36,13 +36,13 @@ def generate_images(prompt: str, num_images: int = 3) -> List[Dict[str, str]]:
     }
     
     try:
-        # response = requests.post(url, headers=headers, json=payload)
-        # response.raise_for_status()
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
         
-        # data = response.json()
-        with open('/home/yash/Desktop/personal_projects/chaotix/StabilityImageGenerator/response.json') as f:
-            data = json.load(f)
-        generated_images = []
+        data = response.json()
+        # with open('/home/yash/Desktop/personal_projects/chaotix/StabilityImageGenerator/response.json') as f:
+        #     data = json.load(f)
+        res = []
         
         for idx, artifact in enumerate(data['artifacts']):
             image_data = base64.b64decode(artifact['base64'])
@@ -55,19 +55,17 @@ def generate_images(prompt: str, num_images: int = 3) -> List[Dict[str, str]]:
             upload_result = cloudinary.uploader.upload(img_byte_arr)
             cloudinary_url = upload_result['secure_url']
             
-            generated_images.append({
-                "id":f"{idx}",
-                # "id": f"{response.headers.get('X-Request-ID', 'unknown')}-{idx}",
+            res.append({
+                "id":f"{generate_images.request.id}",
                 "prompt": prompt,
                 "image_url": cloudinary_url,
             })
         
         webhook_url = f"{settings.FASTAPI_BASE_URL}/image-gen/api/1/webhook/task-complete"
-        print(webhook_url)
-        requests.post(webhook_url, json={"task_id": generate_images.request.id, "result": generated_images})
+        requests.post(webhook_url, json={"task_id": generate_images.request.id, "result": res})
         
-        return generated_images
+        return res
     except Exception as e:
-        webhook_url = f"{settings.FASTAPI_BASE_URL}/webhook/task-failed"
+        webhook_url = f"{settings.FASTAPI_BASE_URL}/image-gen/api/1/webhook/task-failed"
         requests.post(webhook_url, json={"task_id": generate_images.request.id, "error": str(e)})
         raise Exception(f"Image generation or upload failed: {str(e)}")

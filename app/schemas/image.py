@@ -6,7 +6,8 @@ class ImageGenerationRequest(BaseModel):
     prompt: str
 
 class GeneratedImage(BaseModel):
-    id: str
+    id: Optional[int]
+    task_id: str
     prompt: Optional[str] = None
     image_url: Optional[str] = None
     status: str

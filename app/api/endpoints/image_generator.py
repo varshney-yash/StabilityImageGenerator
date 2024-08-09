@@ -1,8 +1,8 @@
 from typing import List, Dict
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.schemas.image import ImageGenerationRequest, GeneratedImage
+from app.schemas.image import GeneratedImage
 from app.services.stability_ai import generate_images
 from app.core.celery_app import celery_app
 from app.core.database import get_session
@@ -10,14 +10,14 @@ from app.models.image import GeneratedImage as DBGeneratedImage
 
 router = APIRouter()
 
-@router.post("/generate", response_model=List[GeneratedImage])
+@router.post("/generate")
 async def create_images(
-    request: ImageGenerationRequest,
+    prompt: str = Body(..., embed=True),
     session: AsyncSession = Depends(get_session)
 ):
     try:
-        task = generate_images.delay(request.prompt, 3)
-        return [GeneratedImage(id=task.id, prompt=request.prompt, status="processing", image_url="")]
+        task = generate_images.delay(prompt, 3)
+        return [{"task_id": task.id, "prompt": prompt, "status": "processing", "image_url": ""}]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -25,12 +25,12 @@ async def create_images(
 async def task_complete_webhook(task_data: Dict, session: AsyncSession = Depends(get_session)):
     task_id = task_data["task_id"]
     result = task_data["result"]
-    
     async with session.begin():
         for image_data in result:
             db_image = DBGeneratedImage(
-                prompt=image_data['prompt'],
-                image_url=image_data['image_url']
+                task_id = task_id,
+                prompt = image_data['prompt'],
+                image_url = image_data['image_url']
             )
             session.add(db_image)      
         await session.commit()
@@ -41,26 +41,28 @@ async def task_complete_webhook(task_data: Dict, session: AsyncSession = Depends
 async def task_failed_webhook(task_data: Dict):
     task_id = task_data["task_id"]
     error = task_data["error"]
-    print(f"Task {task_id} failed: {error}")
     return {"status": "error", "message": f"Task {task_id} failed"}
 
-@router.get("/status/{task_id}", response_model=List[GeneratedImage])
+@router.get("/status/{task_id}/")
 async def get_task_status(task_id: str, session: AsyncSession = Depends(get_session)):
     async with session.begin():
-        result = await session.execute(select(DBGeneratedImage).where(DBGeneratedImage.id == task_id))
+        result = await session.execute(select(DBGeneratedImage).where(DBGeneratedImage.task_id == task_id))
         db_images = result.scalars().all()
         if db_images:
-            return [GeneratedImage(
-                id=str(img.id),
-                prompt=img.prompt,
-                image_url=img.image_url,
-                status="completed",
-                created_at=img.created_at
-            ) for img in db_images]
+            return [
+                {
+                    "id": img.id,  
+                    "task_id": str(img.task_id),
+                    "prompt": img.prompt,
+                    "image_url": img.image_url,
+                    "status": "completed",
+                    "created_at": img.created_at
+                } for img in db_images
+            ]
         else:
             task = celery_app.AsyncResult(task_id)
             if task.state == 'PENDING':
-                return [GeneratedImage(id=task_id, prompt="", status="processing", image_url="")]
+                return [{"task_id":task_id,"status":"processing"}]
             else:
                 raise HTTPException(status_code=404, detail="Task not found or failed")
 
@@ -70,7 +72,7 @@ async def get_all_images(session: AsyncSession = Depends(get_session)):
         result = await session.execute(select(DBGeneratedImage))
         db_images = result.scalars().all()
         return [GeneratedImage(
-            id=str(img.id),
+            task_id=str(img.task_id),
             prompt=img.prompt,
             image_url=img.image_url,
             status="completed",
