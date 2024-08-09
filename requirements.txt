@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+celery
+redis
+requests
+pydantic
+pydantic-settings
+sqlalchemy
+typing-extensions
+pillow
+psycopg2-binary
+asyncpg
+cloudinary
