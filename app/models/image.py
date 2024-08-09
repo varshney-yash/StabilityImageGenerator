@@ -1,7 +1,13 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from app.core.database import Base
 
-Base = declarative_base()
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
 
 class GeneratedImage(Base):
     __tablename__ = "generated_images"
@@ -13,3 +19,7 @@ class GeneratedImage(Base):
     status = Column(String, nullable=False)
     created_at = Column(DateTime)
     user_id = Column(Integer, ForeignKey("users.id"))
+
+    user = relationship("User", back_populates="images")
+
+User.images = relationship("GeneratedImage", back_populates="user")

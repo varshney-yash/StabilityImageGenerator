@@ -5,7 +5,7 @@ from app.models.image import GeneratedImage
 from app.core.database import get_session
 from app.core.auth import *
 from fastapi.security import OAuth2PasswordRequestForm
-from app.models.user import User
+from app.models.image import User
 
 
 router = APIRouter()

@@ -8,7 +8,7 @@ from app.core.celery_app import celery_app
 from app.core.database import get_session
 from app.models.image import GeneratedImage as DBGeneratedImage
 from app.core.auth import get_current_user
-from app.models.user import User
+from app.models.image import User
 
 router = APIRouter()
 
