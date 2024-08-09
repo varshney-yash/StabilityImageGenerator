@@ -17,7 +17,7 @@ cloudinary.config(
 )
 
 @shared_task
-def generate_images(prompt: str, num_images: int = 3) -> List[Dict[str, str]]:
+def generate_images(prompt: str, num_images: int = 3, user_id: int = None) -> List[Dict[str, str]]:
     url = f"{settings.STABILITY_API_HOST}/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
     
     headers = {
@@ -59,6 +59,7 @@ def generate_images(prompt: str, num_images: int = 3) -> List[Dict[str, str]]:
                 "id":f"{generate_images.request.id}",
                 "prompt": prompt,
                 "image_url": cloudinary_url,
+                "user_id": user_id
             })
         
         webhook_url = f"{settings.FASTAPI_BASE_URL}/image-gen/api/1/webhook/task-complete"

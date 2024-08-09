@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -12,3 +12,4 @@ class GeneratedImage(Base):
     image_url = Column(String)
     status = Column(String, nullable=False)
     created_at = Column(DateTime)
+    user_id = Column(Integer, ForeignKey("users.id"))

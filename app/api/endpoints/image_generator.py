@@ -7,17 +7,20 @@ from app.services.stability_ai import generate_images
 from app.core.celery_app import celery_app
 from app.core.database import get_session
 from app.models.image import GeneratedImage as DBGeneratedImage
+from app.core.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter()
 
 @router.post("/generate")
 async def create_images(
     prompt: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
     try:
-        task = generate_images.delay(prompt, 3)
-        return [{"task_id": task.id, "prompt": prompt, "status": "processing", "image_url": ""}]
+        task = generate_images.delay(prompt, 3, current_user.id)
+        return {"task_id": task.id, "prompt": prompt, "status": "processing", "user_id": current_user.id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -28,14 +31,17 @@ async def task_complete_webhook(task_data: Dict, session: AsyncSession = Depends
     async with session.begin():
         for image_data in result:
             db_image = DBGeneratedImage(
-                task_id = task_id,
-                prompt = image_data['prompt'],
-                image_url = image_data['image_url']
+                task_id=task_id,
+                prompt=image_data['prompt'],
+                image_url=image_data['image_url'],
+                user_id=image_data['user_id'],
+                status="completed"
             )
             session.add(db_image)      
         await session.commit()
     
     return {"status": "success", "message": f"Task {task_id} completed and data saved"}
+
 
 @router.post("/webhook/task-failed")
 async def task_failed_webhook(task_data: Dict):
